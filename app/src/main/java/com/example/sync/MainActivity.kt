@@ -11,24 +11,43 @@ import android.app.AlertDialog
 import android.content.SharedPreferences
 import android.text.InputType
 import android.util.Log
+import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.Toast
 import android.widget.TextView
 import android.widget.AutoCompleteTextView
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.PopupMenu
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import androidx.recyclerview.widget.RecyclerView
 import com.example.sync.data.FactoryLocalStore
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.example.sync.data.FactoryLocalStore
+import com.example.sync.data.FactoryRemoteRepository
+import com.example.sync.data.ScanLogRepository
+import com.example.sync.databinding.ActivityMainBinding
+import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
     private lateinit var sharedPreferences: SharedPreferences
+    private lateinit var factoryStore: FactoryLocalStore
+    private lateinit var factoryRemoteRepository: FactoryRemoteRepository
+    private lateinit var scanLogRepository: ScanLogRepository
     private lateinit var factoryAdapter: ArrayAdapter<String>
     private lateinit var dropdown: AutoCompleteTextView
     private lateinit var recyclerView: RecyclerView
@@ -43,12 +62,20 @@ class MainActivity : AppCompatActivity() {
 
         setSupportActionBar(binding.toolbar)
 
-        binding.fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                .setAction("Action", null)
-                .setAnchorView(R.id.fab).show()
-        }
+        factoryStore = FactoryLocalStore(this)
+        factoryRemoteRepository = FactoryRemoteRepository()
+        scanLogRepository = ScanLogRepository(this)
 
+        dropdown = findViewById(R.id.factoryDropdown)
+        recyclerView = findViewById(R.id.recyclerView)
+        recyclerView.layoutManager = LinearLayoutManager(this)
+
+        factoryAdapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_dropdown_item_1line,
+            factoryStore.getFactories().sorted().toMutableList()
+        )
+        dropdown.setAdapter(factoryAdapter)
 
         loadDeviceId()
         dropdown = findViewById(R.id.factoryDropdown)
@@ -364,6 +391,54 @@ class MainActivity : AppCompatActivity() {
         }
 
         builder.show()
+    }
+
+    private fun createFactory(factoryName: String, location: String, createdBy: String) {
+        lifecycleScope.launch {
+            val result = factoryRemoteRepository.createFactory(
+                name = factoryName,
+                location = location,
+                createdBy = createdBy
+            )
+
+            if (result.isSuccess) {
+                val createResult = result.getOrNull()
+                val returnedName = createResult?.record?.name?.trim().orEmpty()
+                val nameToStore = if (returnedName.isNotEmpty()) returnedName else factoryName
+
+                factoryStore.addFactory(nameToStore)
+                refreshFactoryDropdown()
+                val successMessage = createResult?.message ?: "Factory created"
+                Toast.makeText(this@MainActivity, successMessage, Toast.LENGTH_SHORT).show()
+            } else {
+                val error = result.exceptionOrNull()?.message ?: "Unknown error"
+                Toast.makeText(this@MainActivity, error, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun syncFactories() {
+        lifecycleScope.launch {
+            val result = factoryRemoteRepository.listFactories()
+            if (result.isSuccess) {
+                val factories = result.getOrNull().orEmpty()
+                    .mapNotNull { it.name?.trim() }
+                    .filter { it.isNotEmpty() }
+                    .toSet()
+
+                factoryStore.replaceFactories(factories)
+                refreshFactoryDropdown()
+                dropdown.setText("", false)
+                Toast.makeText(
+                    this@MainActivity,
+                    "Synced ${factories.size} factories",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                val error = result.exceptionOrNull()?.message ?: "Factory sync failed"
+                Toast.makeText(this@MainActivity, error, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     override fun onResume() {

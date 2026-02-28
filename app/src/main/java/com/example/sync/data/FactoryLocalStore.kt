@@ -10,6 +10,8 @@ class FactoryLocalStore(context: Context) {
 
     fun getDeviceId(): String = preferences.getString(KEY_DEVICE_ID, DEFAULT_DEVICE_ID) ?: DEFAULT_DEVICE_ID
 
+    fun hasDeviceId(): Boolean = getDeviceId() != DEFAULT_DEVICE_ID
+
     fun saveDeviceId(deviceId: String) {
         preferences.edit()
             .putString(KEY_DEVICE_ID, deviceId)
