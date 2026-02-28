@@ -1,0 +1,78 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Built application files
+*.apk
+*.aab
+*.ap_
+
+# Gradle files
+.gradle/
+build/
+**/build/
+
+# Local configuration file (SDK path etc.)
+local.properties
+
+# Log files
+*.log
+
+# Android Studio
+.idea/
+*.iml
+*.iws
+*.ipr
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Kotlin
+*.kotlin_module
+
+# Keystore files (IMPORTANT - never commit)
+*.jks
+*.keystore
+
+# Generated files
+/bin/
+/gen/
+out/
+
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Firebase (if used)
+google-services.json
+
+# Signing configs
+signing.properties
+
+# NDK
+obj/
+
+# Navigation safe args
+.navigation/
+
+# Room
+schemas/
+
+# Gradle wrapper (keep wrapper jar & properties!)
+# DO NOT ignore these:
+# gradle/wrapper/gradle-wrapper.jar
+# gradle/wrapper/gradle-wrapper.properties

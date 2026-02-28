@@ -1,0 +1,19 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/action_open_for_give"
+        android:title="@string/action_open_for_give" />
+
+    <item
+        android:id="@+id/action_open_for_take"
+        android:title="@string/action_open_for_take" />
+
+    <item
+        android:id="@+id/action_local_sync"
+        android:title="@string/action_local_sync" />
+
+    <item
+        android:id="@+id/action_global_sync"
+        android:title="@string/action_global_sync" />
+
+</menu>
