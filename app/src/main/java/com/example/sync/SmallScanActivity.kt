@@ -5,6 +5,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.Toast
 import com.example.sync.data.ScanLogRepository
+import com.example.sync.data.FactoryLocalStore
 import com.journeyapps.barcodescanner.CaptureActivity
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
 import com.journeyapps.barcodescanner.Size
@@ -14,6 +15,8 @@ class SmallScanActivity : CaptureActivity() {
     private lateinit var barcodeView: DecoratedBarcodeView
     private lateinit var btnMissing: Button
     private lateinit var scanLogRepository: ScanLogRepository
+
+    private lateinit var factoryLocalStore: FactoryLocalStore
     private var currentMode: String = "GIVE"
     private var sdMissingPressed = false
     private var lastScannedText: String? = null
@@ -50,11 +53,12 @@ class SmallScanActivity : CaptureActivity() {
             val sdStatus = if (sdMissingPressed) "MISSING" else "PRESENT"
             sdMissingPressed = false
 
-            scanLogRepository.appendScan(
-                qr = qrText,
+            scanLogRepository.upsertScan(
+                deviceId = qrText,
                 mode = currentMode,
-                sdStatus = sdStatus,
-                timestamp = currentTime
+                userId = factoryLocalStore.getDeviceId(),
+                factoryId = factoryLocalStore.getCurrentFactory(),
+                isSdMissing = false
             )
 
             runOnUiThread {

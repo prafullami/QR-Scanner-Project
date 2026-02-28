@@ -28,9 +28,9 @@ class ScanAdapter(private val list: List<ScanRecord>) :
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = list[position]
 
-        holder.qr.text = item.qr
-        holder.given.visibility = if (item.given) View.VISIBLE else View.GONE
-        holder.taken.visibility = if (item.taken) View.VISIBLE else View.GONE
-        holder.missing.isChecked = item.sdMissing
+//        holder.qr.text = item.qr
+//        holder.given.visibility = if (item.given) View.VISIBLE else View.INVISIBLE
+//        holder.taken.visibility = if (item.taken) View.VISIBLE else View.INVISIBLE
+//        holder.missing.isChecked = item.sdMissing
     }
 }

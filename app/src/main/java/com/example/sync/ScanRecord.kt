@@ -1,8 +1,12 @@
 package com.example.sync
 
 data class ScanRecord(
-    val qr: String,
-    var given: Boolean = false,
-    var taken: Boolean = false,
-    var sdMissing: Boolean = false
+    val deviceId: String,
+    var givenById: String = "",
+    var givenTime: String = "",
+    var takenById: String = "",
+    var takenTime: String = "",
+    var sdCardMissingTime: String = "",
+    var factoryId: String = "",
+    var recordingDate: String = ""
 )

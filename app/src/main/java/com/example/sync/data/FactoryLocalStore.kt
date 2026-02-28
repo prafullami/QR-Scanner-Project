@@ -28,6 +28,16 @@ class FactoryLocalStore(context: Context) {
         saveFactories(factories.toSet())
     }
 
+    fun saveCurrentFactory(factoryName: String?) {
+        preferences.edit()
+            .putString(KEY_CURRENT_FACTORY, factoryName)
+            .apply()
+    }
+
+    fun getCurrentFactory(): String {
+        return preferences.getString(KEY_CURRENT_FACTORY, null)?: ""
+    }
+
     private fun saveFactories(factories: Set<String>) {
         preferences.edit()
             .putStringSet(KEY_FACTORIES, factories)
@@ -39,5 +49,6 @@ class FactoryLocalStore(context: Context) {
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_FACTORIES = "factories"
         private const val DEFAULT_DEVICE_ID = "No ID"
+        private const val KEY_CURRENT_FACTORY = "current_factory"
     }
 }
