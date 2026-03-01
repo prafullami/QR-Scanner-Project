@@ -1,214 +1,261 @@
 package com.example.sync
 
-import android.app.AlertDialog
 import android.os.Bundle
-import android.text.InputType
+import com.google.android.material.snackbar.Snackbar
+import androidx.appcompat.app.AppCompatActivity
+import androidx.navigation.ui.AppBarConfiguration
 import android.view.Menu
 import android.view.MenuItem
-import android.view.ViewGroup
+import com.example.sync.databinding.ActivityMainBinding
+import android.app.AlertDialog
+import android.content.SharedPreferences
+import android.text.InputType
+import android.util.Log
 import android.widget.ArrayAdapter
-import android.widget.AutoCompleteTextView
 import android.widget.EditText
+import android.widget.Toast
+import android.widget.TextView
+import android.widget.AutoCompleteTextView
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.PopupMenu
-import android.widget.TextView
-import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.example.sync.data.FactoryLocalStore
-import com.example.sync.data.FactoryRemoteRepository
-import com.example.sync.data.ScanLogRepository
-import com.example.sync.databinding.ActivityMainBinding
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
-import kotlinx.coroutines.launch
+import androidx.recyclerview.widget.RecyclerView
+import com.example.sync.data.FactoryLocalStore
+import com.example.sync.data.ScanLogRepository
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
-    private lateinit var factoryStore: FactoryLocalStore
-    private lateinit var factoryRemoteRepository: FactoryRemoteRepository
-    private lateinit var scanLogRepository: ScanLogRepository
+    private lateinit var sharedPreferences: SharedPreferences
     private lateinit var factoryAdapter: ArrayAdapter<String>
     private lateinit var dropdown: AutoCompleteTextView
     private lateinit var recyclerView: RecyclerView
 
+    private lateinit var adapter: ScanAdapter
+
+    private lateinit var factoryLocalStore: FactoryLocalStore
+    private lateinit var scanLogRepository: ScanLogRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        factoryLocalStore = FactoryLocalStore(this)
+        scanLogRepository = ScanLogRepository(this)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
         setSupportActionBar(binding.toolbar)
 
-        factoryStore = FactoryLocalStore(this)
-        factoryRemoteRepository = FactoryRemoteRepository()
-        scanLogRepository = ScanLogRepository(this)
+        binding.fab.setOnClickListener { view ->
+            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
+                .setAction("Action", null)
+                .setAnchorView(R.id.fab).show()
+        }
 
+
+        loadDeviceId()
         dropdown = findViewById(R.id.factoryDropdown)
-        recyclerView = findViewById(R.id.recyclerView)
-        recyclerView.layoutManager = LinearLayoutManager(this)
 
+        val btnCorrect = findViewById<ImageButton>(R.id.btnCorrect)
+        val btnEdit = findViewById<ImageButton>(R.id.btnEdit)
+        val fab = findViewById<FloatingActionButton>(R.id.fab)
+
+        btnEdit.isEnabled = false
+        val currentFactory = factoryLocalStore.getCurrentFactory()
+        if(currentFactory != "") {
+            dropdown.setText(currentFactory);
+            dropdown.isEnabled = false
+            btnCorrect.isEnabled = false
+            btnEdit.isEnabled = true
+        }
+        val factories = factoryLocalStore.getFactories().map { it.substringBefore(":") }
         factoryAdapter = ArrayAdapter(
             this,
             android.R.layout.simple_dropdown_item_1line,
-            factoryStore.getFactories().sorted().toMutableList()
+            factories
         )
+
         dropdown.setAdapter(factoryAdapter)
 
-        loadDeviceId()
-        setupFactoryControls()
-        setupFabMenu()
-        restoreSelectedFactory()
-        loadTable()
-    }
-
-    private fun setupFactoryControls() {
-        val btnCorrect = findViewById<ImageButton>(R.id.btnCorrect)
-        val btnEdit = findViewById<ImageButton>(R.id.btnEdit)
-
-        btnEdit.isEnabled = false
-        btnEdit.alpha = 0.5f
-
         btnCorrect.setOnClickListener {
-            val selectedFactory = dropdown.text.toString().trim()
-            if (selectedFactory.isEmpty()) {
-                Toast.makeText(this, "Select a factory first", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
 
-            lockFactorySelection(selectedFactory, btnCorrect, btnEdit)
-            Toast.makeText(this, "Factory locked", Toast.LENGTH_SHORT).show()
+            val selectedFactory = dropdown.text.toString()
+
+            if (selectedFactory.isNotEmpty()) {
+
+                dropdown.isEnabled = false
+                btnCorrect.isEnabled = false
+                btnEdit.isEnabled = true
+                btnCorrect.alpha = 0.5f
+                btnEdit.alpha = 1f
+                factoryLocalStore.saveCurrentFactory(selectedFactory);
+                Toast.makeText(this, "Factory Locked", Toast.LENGTH_SHORT).show()
+
+            } else {
+                Toast.makeText(this, "Select a factory first", Toast.LENGTH_SHORT).show()
+            }
         }
 
         btnEdit.setOnClickListener {
-            unlockFactorySelection(btnCorrect, btnEdit)
-            factoryStore.saveCurrentFactory(null)
-            Toast.makeText(this, "Factory unlocked", Toast.LENGTH_SHORT).show()
+            val selectedFactory = dropdown.text.toString()
+
+            if (selectedFactory.isNotEmpty()) {
+                showEditFactoryDialog(selectedFactory)
+                factoryLocalStore.saveCurrentFactory(null)
+                dropdown.isEnabled = true
+                btnCorrect.isEnabled = true
+                btnEdit.isEnabled = false
+                btnEdit.alpha = 0.5f
+                btnCorrect.alpha = 1f
+            } else {
+                Toast.makeText(this, "Select factory to edit", Toast.LENGTH_SHORT).show()
+            }
+
+            Toast.makeText(this, "Edit Mode Enabled", Toast.LENGTH_SHORT).show()
         }
-    }
 
-    private fun lockFactorySelection(
-        selectedFactory: String,
-        btnCorrect: ImageButton,
-        btnEdit: ImageButton
-    ) {
-        dropdown.setText(selectedFactory, false)
-        dropdown.isEnabled = false
-        btnCorrect.isEnabled = false
-        btnEdit.isEnabled = true
-        btnCorrect.alpha = 0.5f
-        btnEdit.alpha = 1f
-        factoryStore.saveCurrentFactory(selectedFactory)
-    }
-
-    private fun unlockFactorySelection(btnCorrect: ImageButton, btnEdit: ImageButton) {
-        dropdown.isEnabled = true
-        btnCorrect.isEnabled = true
-        btnEdit.isEnabled = false
-        btnEdit.alpha = 0.5f
-        btnCorrect.alpha = 1f
-    }
-
-    private fun restoreSelectedFactory() {
-        val currentFactory = factoryStore.getCurrentFactory().trim()
-        if (currentFactory.isEmpty()) return
-
-        val btnCorrect = findViewById<ImageButton>(R.id.btnCorrect)
-        val btnEdit = findViewById<ImageButton>(R.id.btnEdit)
-        lockFactorySelection(currentFactory, btnCorrect, btnEdit)
-    }
-
-    private fun setupFabMenu() {
-        val fab = findViewById<FloatingActionButton>(R.id.fab)
         fab.setOnClickListener { view ->
+
             val popup = PopupMenu(this, view)
             popup.menuInflater.inflate(R.menu.fab_menu, popup.menu)
 
             popup.setOnMenuItemClickListener { item ->
                 when (item.itemId) {
+
                     R.id.action_local_sync -> {
-                        Toast.makeText(this, "Local sync not implemented", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Syncing...", Toast.LENGTH_SHORT).show()
                         true
                     }
 
                     R.id.action_global_sync -> {
-                        Toast.makeText(this, "Global sync not implemented", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Syncing...", Toast.LENGTH_SHORT).show()
                         true
                     }
 
                     R.id.action_open_for_give -> {
                         openScanner("GIVE")
+                        Toast.makeText(this, "Syncing...", Toast.LENGTH_SHORT).show()
                         true
                     }
 
                     R.id.action_open_for_take -> {
                         openScanner("TAKE")
+                        Toast.makeText(this, "Syncing...", Toast.LENGTH_SHORT).show()
                         true
                     }
 
                     else -> false
                 }
             }
+
             popup.show()
         }
+        adapter = ScanAdapter(emptyList())
+        recyclerView = findViewById(R.id.recyclerView)
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.adapter = adapter
+
+        loadTable()
     }
 
     private fun loadTable() {
-        recyclerView.adapter = ScanAdapter(scanLogRepository.loadRecords())
+
+        val data = scanLogRepository.getDisplayData()
+        adapter.updateData(data)
     }
 
+
     private fun refreshFactoryDropdown() {
-        val updatedFactories = factoryStore.getFactories().sorted()
+        val updatedFactories = factoryLocalStore.getFactories().map { it.substringBefore(":") }
         factoryAdapter.clear()
         factoryAdapter.addAll(updatedFactories)
         factoryAdapter.notifyDataSetChanged()
     }
 
-    private val qrLauncher = registerForActivityResult(ScanContract()) { result ->
+    private val qrLauncher = registerForActivityResult(
+        ScanContract()
+    ) { result ->
         if (result.contents != null) {
             Toast.makeText(this, "Scanned: ${result.contents}", Toast.LENGTH_LONG).show()
         } else {
-            Toast.makeText(this, "Scanner closed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Cancelled", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun openScanner(purpose: String) {
+
         val options = ScanOptions()
         options.setDesiredBarcodeFormats(ScanOptions.QR_CODE)
         options.setPrompt("Scan QR Code")
         options.setBeepEnabled(true)
         options.setOrientationLocked(true)
         options.captureActivity = SmallScanActivity::class.java
-        options.addExtra("MODE", purpose)
+        options.addExtra("MODE",purpose)
         qrLauncher.launch(options)
     }
 
+    private fun showEditFactoryDialog(oldName: String) {
+
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Edit Factory")
+
+        val input = EditText(this)
+        input.setText(oldName)
+
+        builder.setView(input)
+
+        builder.setPositiveButton("Update") { dialog, _ ->
+
+            val newName = input.text.toString().trim()
+
+            if (newName.isNotEmpty()) {
+
+                val factories = factoryLocalStore.getFactories().toMutableSet()
+                factories.remove(oldName)
+                factories.add(newName)
+
+                factoryLocalStore.replaceFactories(factories)
+
+                recreate() // refresh UI
+            }
+
+            dialog.dismiss()
+        }
+
+        builder.setNegativeButton("Cancel") { dialog, _ ->
+            dialog.dismiss()
+        }
+
+        builder.show()
+    }
+
     private fun loadDeviceId() {
+        val deviceId = factoryLocalStore.getDeviceId()
+
         val toolbarTitle = findViewById<TextView>(R.id.toolbarTitle)
-        toolbarTitle.text = factoryStore.getDeviceId()
+        toolbarTitle.text = deviceId
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        // Inflate the menu; this adds items to the action bar if it is present.
         menuInflater.inflate(R.menu.menu_main, menu)
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        // Handle action bar item clicks here. The action bar will
+        // automatically handle clicks on the Home/Up button, so long
+        // as you specify a parent activity in AndroidManifest.xml.
         return when (item.itemId) {
             R.id.action_gen_factory -> {
                 showFactoryDialog()
                 true
             }
-
-            R.id.action_sync_factory -> {
-                syncFactories()
-                true
-            }
-
+            R.id.action_sync_factory -> true
             R.id.action_gen_device_id -> {
                 showDeviceIdDialog()
                 true
@@ -219,83 +266,73 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showDeviceIdDialog() {
+
         val builder = AlertDialog.Builder(this)
         builder.setTitle("Enter Device ID")
 
+        // Create EditText
         val input = EditText(this)
         input.hint = "Device ID"
         input.inputType = InputType.TYPE_CLASS_TEXT
+
         builder.setView(input)
 
         builder.setPositiveButton("Submit") { dialog, _ ->
             val deviceId = input.text.toString().trim()
+
             if (deviceId.isNotEmpty()) {
-                factoryStore.saveDeviceId(deviceId)
+                factoryLocalStore.saveDeviceId(deviceId)
                 loadDeviceId()
-                Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(this, "Please enter Device ID", Toast.LENGTH_SHORT).show()
             }
+
             dialog.dismiss()
         }
 
         builder.setNegativeButton("Cancel") { dialog, _ ->
-            dialog.dismiss()
+            dialog.cancel()
         }
 
         builder.show()
     }
 
     private fun showFactoryDialog() {
+
         val builder = AlertDialog.Builder(this)
         builder.setTitle("Add Factory")
 
+// Create a vertical layout to hold multiple inputs
+        val layout = LinearLayout(this)
+        layout.orientation = LinearLayout.VERTICAL
+        layout.setPadding(50, 40, 50, 10)
+
+// Factory Name input
         val nameInput = EditText(this)
         nameInput.hint = "Enter Factory Name"
+        layout.addView(nameInput)
 
+// Factory Location input
         val locationInput = EditText(this)
-        locationInput.hint = "Enter Location"
+        locationInput.hint = "Enter Factory Location"
+        layout.addView(locationInput)
 
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            val padding = 40
-            setPadding(padding, 16, padding, 8)
-            addView(
-                nameInput,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            )
-            addView(
-                locationInput,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = 16 }
-            )
-        }
-
-        builder.setView(container)
+// Set layout as dialog view
+        builder.setView(layout)
 
         builder.setPositiveButton("Add") { dialog, _ ->
             val factoryName = nameInput.text.toString().trim()
-            val location = locationInput.text.toString().trim()
-            val createdBy = factoryStore.getDeviceId()
+            val factoryLocation = locationInput.text.toString().trim()
 
-            if (factoryName.isEmpty() || location.isEmpty()) {
-                Toast.makeText(this, "Enter factory name and location", Toast.LENGTH_SHORT).show()
-                dialog.dismiss()
-                return@setPositiveButton
+            if (factoryName.isNotEmpty() && factoryLocation.isNotEmpty()) {
+                factoryLocalStore.addFactory(factoryName, "1")
+                Toast.makeText(this, "Factory Added", Toast.LENGTH_SHORT).show()
+                refreshFactoryDropdown()
+            } else {
+                Toast.makeText(this, "Enter all details", Toast.LENGTH_SHORT).show()
             }
 
-            if (!factoryStore.hasDeviceId()) {
-                Toast.makeText(this, "Set Device ID first", Toast.LENGTH_SHORT).show()
-                dialog.dismiss()
-                return@setPositiveButton
-            }
-
-            createFactory(factoryName, location, createdBy)
             dialog.dismiss()
         }
 
@@ -306,56 +343,10 @@ class MainActivity : AppCompatActivity() {
         builder.show()
     }
 
-    private fun createFactory(factoryName: String, location: String, createdBy: String) {
-        lifecycleScope.launch {
-            val result = factoryRemoteRepository.createFactory(
-                name = factoryName,
-                location = location,
-                createdBy = createdBy
-            )
-
-            if (result.isSuccess) {
-                val createResult = result.getOrNull()
-                val returnedName = createResult?.record?.name?.trim().orEmpty()
-                val nameToStore = if (returnedName.isNotEmpty()) returnedName else factoryName
-
-                factoryStore.addFactory(nameToStore)
-                refreshFactoryDropdown()
-                val successMessage = createResult?.message ?: "Factory created"
-                Toast.makeText(this@MainActivity, successMessage, Toast.LENGTH_SHORT).show()
-            } else {
-                val error = result.exceptionOrNull()?.message ?: "Unknown error"
-                Toast.makeText(this@MainActivity, error, Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    private fun syncFactories() {
-        lifecycleScope.launch {
-            val result = factoryRemoteRepository.listFactories()
-            if (result.isSuccess) {
-                val factories = result.getOrNull().orEmpty()
-                    .mapNotNull { it.name?.trim() }
-                    .filter { it.isNotEmpty() }
-                    .toSet()
-
-                factoryStore.replaceFactories(factories)
-                refreshFactoryDropdown()
-                dropdown.setText("", false)
-                Toast.makeText(
-                    this@MainActivity,
-                    "Synced ${factories.size} factories",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } else {
-                val error = result.exceptionOrNull()?.message ?: "Factory sync failed"
-                Toast.makeText(this@MainActivity, error, Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
     override fun onResume() {
         super.onResume()
         loadTable()
+//        loadTable()
     }
+
 }

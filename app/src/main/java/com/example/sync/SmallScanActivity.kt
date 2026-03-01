@@ -1,6 +1,7 @@
 package com.example.sync
 
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.Toast
@@ -21,12 +22,14 @@ class SmallScanActivity : CaptureActivity() {
     private var sdMissingPressed = false
     private var lastScannedText: String? = null
     private var lastScanTime: Long = 0
+    private lateinit var currentFactoryName: String;
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_small_scan)
 
         scanLogRepository = ScanLogRepository(this)
+        factoryLocalStore = FactoryLocalStore(this)
         currentMode = intent.getStringExtra("MODE") ?: "GIVE"
 
         btnMissing = findViewById(R.id.btnSdMissing)
@@ -36,6 +39,14 @@ class SmallScanActivity : CaptureActivity() {
 
         btnMissing.setOnClickListener {
             sdMissingPressed = true
+            scanLogRepository.upsertScan(
+                deviceId = lastScannedText as String,
+                mode = currentMode,
+                userId = factoryLocalStore.getDeviceId(),
+                factoryId = factoryLocalStore.getFactoryId(factoryLocalStore.getCurrentFactory()),
+                isSdMissing = sdMissingPressed
+            )
+            val data = scanLogRepository.getDeviceDetails(lastScannedText as String)
             Toast.makeText(this, "Marked SD Missing", Toast.LENGTH_SHORT).show()
         }
 
@@ -49,18 +60,18 @@ class SmallScanActivity : CaptureActivity() {
 
             lastScannedText = qrText
             lastScanTime = currentTime
-
             val sdStatus = if (sdMissingPressed) "MISSING" else "PRESENT"
             sdMissingPressed = false
-
             scanLogRepository.upsertScan(
                 deviceId = qrText,
                 mode = currentMode,
                 userId = factoryLocalStore.getDeviceId(),
-                factoryId = factoryLocalStore.getCurrentFactory(),
-                isSdMissing = false
+                factoryId = factoryLocalStore.getFactoryId(factoryLocalStore.getCurrentFactory()),
+                isSdMissing = sdMissingPressed
             )
-
+            scanLogRepository.generateDeviceIdIndexDict(lastScannedText)
+            Log.d("IndexforDeviceId", scanLogRepository.getDeviceIdIndex(lastScannedText).toString())
+            val data = scanLogRepository.getDeviceDetails(lastScannedText as String)
             runOnUiThread {
                 Toast.makeText(this, "Scanned: $qrText", Toast.LENGTH_SHORT).show()
             }

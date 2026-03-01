@@ -11,6 +11,8 @@
         android:layout_width="0dp"
         android:layout_weight="2"
         android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
         android:textStyle="bold"/>
 
     <TextView
@@ -18,8 +20,6 @@
         android:layout_width="0dp"
         android:layout_weight="1"
         android:gravity="center"
-        android:text="✔"
-        android:visibility="gone"
         android:layout_height="wrap_content"/>
 
     <TextView
@@ -27,14 +27,13 @@
         android:layout_width="0dp"
         android:layout_weight="1"
         android:gravity="center"
-        android:text="✔"
-        android:visibility="gone"
         android:layout_height="wrap_content"/>
 
-    <CheckBox
-        android:id="@+id/checkMissing"
+    <TextView
+        android:id="@+id/txtMissing"
         android:layout_width="0dp"
         android:layout_weight="1"
-        android:enabled="false"
+        android:gravity="center"
         android:layout_height="wrap_content"/>
+
 </LinearLayout>

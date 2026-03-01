@@ -1,6 +1,8 @@
 package com.example.sync.data
 
 import android.content.Context
+import android.content.SharedPreferences
+import com.example.sync.DisplayItem
 import com.example.sync.ScanRecord
 import org.json.JSONArray
 import org.json.JSONObject
@@ -9,15 +11,16 @@ import java.time.Instant
 import java.time.LocalDate
 
 class ScanLogRepository(private val context: Context) {
-
+    val preferences: SharedPreferences =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     fun upsertScan(
         deviceId: String,
         mode: String,
         userId: String,
-        factoryId: String,
+        factoryId: String?,
         isSdMissing: Boolean
     ) {
-
+        val factoryId1 = factoryId
         val file = File(context.filesDir, FILE_NAME)
 
         val jsonArray = if (file.exists()) {
@@ -35,6 +38,14 @@ class ScanLogRepository(private val context: Context) {
             if (obj.getString("deviceId") == deviceId) {
                 existingObject = obj
                 existingIndex = i
+                if(mode == "TAKE") {
+                    val allDevices = loadRecords()
+                    allDevices.get(getDeviceIdIndex(deviceId) as Int).givenById = userId
+                    allDevices.get(getDeviceIdIndex(deviceId) as Int).givenTime = Instant.now().toString()
+                    if(isSdMissing) allDevices.get(getDeviceIdIndex(deviceId) as Int).sdCardMissingTime = Instant.now().toString()
+                    val jsonArray = JSONArray(allDevices)
+                    file.writeText(jsonArray.toString(2))
+                }
                 break
             }
         }
@@ -80,6 +91,7 @@ class ScanLogRepository(private val context: Context) {
 
         // 💾 Save back to file
         file.writeText(jsonArray.toString(2))
+
     }
 
     fun loadRecords(): List<ScanRecord> {
@@ -110,7 +122,58 @@ class ScanLogRepository(private val context: Context) {
         return list
     }
 
+    fun generateDeviceIdIndexDict(currentScannedText:String?) {
+
+        val allRecords = loadRecords();
+        val dict = preferences.getString("devIdIndex","{}")
+        if(dict == "{}") {
+            val jsonObject = JSONObject();
+            jsonObject.put(currentScannedText,0)
+            preferences.edit().putString("devIdIndex",jsonObject.toString()).apply()
+        }
+         else {
+            val jsonObject = JSONObject(dict);
+            jsonObject.put(currentScannedText, allRecords.size - 1)
+            preferences.edit().putString("devIdIndex",jsonObject.toString()).apply()
+        }
+    }
+
+    fun getDeviceIdIndex(deviceId: String?): Int? {
+        val dict = preferences.getString("devIdIndex","{}")
+        if(dict == "{}") {
+            return null
+        }
+        else {
+            val jsonObject = JSONObject(dict);
+            return jsonObject.get(deviceId) as Int
+        }
+    }
+
+    fun getDisplayData(): List<DisplayItem> {
+
+        return loadRecords().map { record ->
+
+            val givenTime = if (record.takenTime.isNotEmpty()) {
+                "TAKEN"
+            } else {
+                "GIVEN"
+            }
+
+            DisplayItem(
+                deviceId = record.deviceId,
+                givenTime = record.givenTime,
+                takenTime = record.takenTime,
+                sdMissingTime = record.sdCardMissingTime.ifEmpty { "" }
+            )
+        }
+    }
+
+    fun getDeviceDetails(deviceId: String): ScanRecord {
+        return loadRecords().get(getDeviceIdIndex(deviceId) as Int)
+    }
+
     companion object {
         private const val FILE_NAME = "scan_log.json"
+        private const val PREFS_NAME = "app_prefs"
     }
 }
